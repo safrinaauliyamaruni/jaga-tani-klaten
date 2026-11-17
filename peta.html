@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Peta - Jaga Tani</title>
+<link rel="stylesheet" href="css/style.css"><link rel="stylesheet" href="lib/leaflet.css">
+<script src="lib/leaflet.js"></script><script src="lib/chart.umd.min.js"></script><script src="lib/papaparse.min.js"></script>
+<script src="js/klaten-data.js"></script><script src="js/common.js"></script><script src="js/geo.js"></script>
+</head><body class="mappage">
+<div class="app" id="app">
+<aside class="panel" id="panel">
+  <div class="ph"><h1>Peta Lahan Pertanian</h1><p>Kabupaten Klaten · 2017–2024</p></div>
+
+  <section class="sec" id="secYear"><button class="sh">Tahun <span class="chev">▾</span></button><div class="sb">
+    <div class="yearbox">
+      <div class="yrow"><span class="yv" id="yv">2024</span>
+        <button class="iconbtn" id="prev" title="Tahun sebelumnya (←)" aria-label="Tahun sebelumnya">◀</button>
+        <button class="iconbtn play" id="play" title="Putar animasi" aria-label="Putar animasi">▶</button>
+        <button class="iconbtn" id="next" title="Tahun berikutnya (→)" aria-label="Tahun berikutnya">▶</button>
+        <span class="spin" id="spinYear" style="margin-left:4px"></span></div>
+      <input type="range" id="yr" min="0" max="7" step="1" value="7" aria-label="Pilih tahun">
+      <div class="yticks" id="yticks"></div>
+    </div></div></section>
+
+  <section class="sec" id="secLayer"><button class="sh">Layer <span class="chev">▾</span></button><div class="sb">
+
+    <!-- Pembanding -->
+    <div class="layer off" id="L-cmp">
+      <div class="lh"><label class="sw"><input type="checkbox" id="onCmp"><i></i></label>
+        <div class="nm" data-for="onCmp">Batas tahun pembanding<small>Garis putus-putus merah</small></div><span class="spin"></span>
+        <button class="tg" aria-label="Pengaturan layer">▾</button></div>
+      <div class="lopt">
+        <div class="r c"><span>Tahun</span><select id="cmpYear"></select></div>
+      </div></div>
+
+    
+
+<!-- Perubahan -->
+    <div class="layer off" id="L-chg">
+      <div class="lh"><label class="sw"><input type="checkbox" id="onChg"><i></i></label>
+        <div class="nm" data-for="onChg">Perubahan 2017 → 2024<small>Lahan hilang &amp; bertambah</small></div><span class="spin"></span>
+        <button class="tg" aria-label="Pengaturan layer">▾</button></div>
+      <div class="lopt">
+        <div class="r"><span>Opasitas</span><input type="range" id="opChg" min="0.1" max="1" step=".05" value=".75"><output>75%</output></div>
+        <div class="r c"><span>Hilang</span><label class="sw"><input type="checkbox" id="showLoss" checked><i></i></label></div>
+        <div class="r c"><span>Bertambah</span><label class="sw"><input type="checkbox" id="showGain" checked><i></i></label></div>
+      </div></div>
+
+    
+
+<!-- Lahan pertanian -->
+    <div class="layer" id="L-shp">
+      <div class="lh"><label class="sw"><input type="checkbox" id="onShp" checked><i></i></label>
+        <div class="nm" data-for="onShp">Lahan pertanian<small id="shpSub">Poligon hasil klasifikasi</small></div><span class="spin"></span>
+        <button class="tg" aria-label="Pengaturan layer">▾</button></div>
+      <div class="lopt">
+        <div class="r c"><span>Isi poligon</span><label class="sw"><input type="checkbox" id="fillc" checked><i></i></label></div>
+        <div class="r"><span>Opasitas isi</span><input type="range" id="pop" min="0.05" max="1" step=".05" value=".45"><output>45%</output></div>
+        <div class="r c"><span>Warna isi</span><input type="color" id="pcol" value="#2f7d4f"></div>
+        <div class="btnrow"><button id="zoomShp">Zoom ke layer</button><button id="tblBtn">Tabel atribut</button></div>
+      </div></div>
+
+    
+
+<!-- Hotspot -->
+    <div class="layer off" id="L-hot">
+      <div class="lh"><label class="sw"><input type="checkbox" id="onHot"><i></i></label>
+        <div class="nm" data-for="onHot">Hotspot kehilangan<small>Grid ±1 km, 10 sel terbesar di tabel</small></div><span class="spin"></span>
+        <button class="tg" aria-label="Pengaturan layer">▾</button></div>
+      <div class="lopt">
+        <div class="r"><span>Opasitas</span><input type="range" id="opHot" min="0.1" max="1" step=".05" value=".75"><output>75%</output></div>
+        <div class="btnrow"><button id="topBtn">Lihat 10 sel teratas</button></div>
+      </div></div>
+  </div></section>
+
+  <section class="sec" id="secInfo"><button class="sh">Ringkasan tahun ini <span class="chev">▾</span></button><div class="sb">
+    <div class="mini" id="mini"></div>
+    <div class="chartbox" style="margin-top:10px"><canvas id="spark"></canvas></div>
+    <div class="hint" id="sparkNote">Batang = luas sawah menurut statistik resmi; batang tahun terpilih disorot.</div>
+  </div></section>
+
+  <section class="sec" id="secInsp"><button class="sh">Inspektur <span class="chev">▾</span></button><div class="sb">
+    <div class="insp" id="insp"><span class="empty">Klik poligon di peta untuk melihat atributnya.</span></div>
+  </div></section>
+</aside>
+
+<div class="mapwrap">
+  <div id="map"></div>
+  <button class="fab tblfab" id="tblFab" title="Buka tabel atribut poligon">▤ Tabel atribut</button>
+  <div class="fab tl pill" id="hoverInfo" style="display:none"></div>
+  <div class="fab bl legendbox" id="legend"></div>
+  <div class="statusbar" id="stat">Memuat…</div>
+  <div class="coord" id="coord"></div>
+  <div class="drawer" id="drawer"><div class="dh"><span id="dTitle">Tabel atribut</span><span class="sub" id="dSub" style="font-weight:400;font-size:12.5px"></span><button class="x" id="dClose">Tutup ✕</button></div><div class="db" id="dBody"></div></div>
+  <button class="mobtoggle" id="mobToggle">☰ Layer</button>
+</div>
+</div>
+
+<script>
+/* ---------- peta dasar & objek utama ---------- */
+const map=L.map('map',{preferCanvas:true,zoomControl:false,minZoom:8}).setView(CFG.center,CFG.zoom);
+L.control.zoom({position:'topright'}).addTo(map);L.control.scale({position:'bottomleft',imperial:false}).addTo(map);
+const BASES={
+  'Jalan':L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}),
+  'Satelit':L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Esri'})};
+BASES['Jalan'].addTo(map);
+/* pilihan peta dasar: ikon layer di bawah tombol zoom (kanan atas) */
+L.control.layers(BASES,null,{position:'topright',collapsed:true}).addTo(map);
+map.on('baselayerchange',e=>e.layer.bringToBack());
+const restack=()=>[S.hot,S.shp,S.chg,S.cmp].forEach(l=>l&&l.bringToFront&&l.bringToFront());
+
+const ys=CFG.years,$=id=>document.getElementById(id);
+let rows=[],yi=ys.length-1,fitted=false,tk=0,timer=null,sel=null;
+const S={shp:null,cmp:null,chg:null,hot:null};   // layer aktif
+const busy=(id,on)=>{$(id).classList.toggle('loading',on);const any=document.querySelector('.layer.loading');$('spinYear').style.display=any?'inline-block':'none'};
+const setStat=t=>$('stat').textContent=t;
+const pctOut=(inp,f)=>{const o=inp.parentNode.querySelector('output');const u=()=>o.textContent=f(+inp.value);u();inp.addEventListener('input',u)};
+
+/* ---------- UI panel: bagian bisa dilipat, layer bisa dibuka ---------- */
+document.querySelectorAll('.sec>.sh').forEach(b=>b.onclick=()=>b.parentNode.classList.toggle('closed'));
+document.querySelectorAll('.layer .tg').forEach(b=>b.onclick=()=>b.closest('.layer').classList.toggle('open'));
+document.querySelectorAll('.layer .nm').forEach(n=>n.onclick=()=>{const c=$(n.dataset.for);c.checked=!c.checked;c.dispatchEvent(new Event('change'))});
+document.querySelectorAll('.layer input[type=checkbox][id^=on]').forEach(c=>c.addEventListener('change',()=>c.closest('.layer').classList.toggle('off',!c.checked)));
+pctOut($('pop'),v=>Math.round(v*100)+'%');pctOut($('opChg'),v=>Math.round(v*100)+'%');pctOut($('opHot'),v=>Math.round(v*100)+'%');
+$('mobToggle').onclick=()=>$('app').classList.add('pn-open');
+map.on('click',()=>{if(innerWidth<=820)$('app').classList.remove('pn-open')});
+map.on('mousemove',e=>$('coord').textContent=e.latlng.lat.toFixed(5)+', '+e.latlng.lng.toFixed(5));
+
+/* ---------- tahun ---------- */
+ys.forEach(y=>$('cmpYear').add(new Option(y,y)));$('cmpYear').value=ys[0];
+$('yticks').innerHTML=ys.map((y,i)=>`<span data-i="${i}">${y}</span>`).join('');
+$('yticks').onclick=e=>{const i=e.target.dataset.i;if(i!=null)goYear(+i)};
+const goYear=i=>{yi=(i+ys.length)%ys.length;$('yr').value=yi;refreshYear()};
+$('yr').oninput=()=>goYear(+$('yr').value);
+$('prev').onclick=()=>goYear(yi-1);$('next').onclick=()=>goYear(yi+1);
+addEventListener('keydown',e=>{if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)&&e.target.type!=='range')return;if(e.key==='ArrowLeft')goYear(yi-1);if(e.key==='ArrowRight')goYear(yi+1)});
+function refreshYear(){
+  const y=ys[yi];$('yv').textContent=y;
+  [...$('yticks').children].forEach((s,i)=>s.classList.toggle('on',i===yi));
+  syncShp();syncCmp();updInfo();
+}
+$('play').onclick=()=>{
+  if(timer){clearTimeout(timer);timer=null;$('play').textContent='▶';return}
+  $('play').textContent='⏸';if(yi===ys.length-1)goYear(0);
+  const tick=()=>{timer=setTimeout(async()=>{if(document.querySelector('.layer.loading')){tick();return}goYear(yi+1);if(yi===ys.length-1){clearTimeout(timer);timer=null;$('play').textContent='▶';return}tick()},1800)};tick();
+};
+
+/* ---------- layer: lahan pertanian ---------- */
+const polyStyle=()=>({color:'#ffd400',weight:1.2,fillColor:$('pcol').value,fillOpacity:$('fillc').checked?+$('pop').value:0});
+const propsHtml=f=>Object.entries(f.properties||{}).filter(([k])=>k!=='area_ha').map(([k,v])=>`<b>${k}</b>: ${v===''?'-':v}`).join('<br>')+`<br><b>luas</b>: ${fmt(polyHa(f.geometry),2)} ha`;
+const popHtml=f=>'<div class="jp"><h4>Poligon lahan pertanian</h4><dl>'+Object.entries(f.properties||{}).filter(([k])=>k!=='area_ha').map(([k,v])=>`<dt>${k}</dt><dd>${v===''?'-':v}</dd>`).join('')+`<dt>luas</dt><dd>${fmt(polyHa(f.geometry),2)} ha</dd></dl></div>`;
+const drawerPad=()=>$('drawer').classList.contains('show')?$('drawer').offsetHeight+12:12;
+function markRow(f){
+  if(drawerMode!=='attr')return;const gj=KGEO['p'+ys[yi]];if(!gj)return;
+  const i=gj.features.indexOf(f),db=$('dBody');db.querySelectorAll('tr.on').forEach(t=>t.classList.remove('on'));
+  const tr=db.querySelector(`tr[data-i="${i}"]`);if(!tr)return;tr.classList.add('on');
+  const r=tr.getBoundingClientRect(),b=db.getBoundingClientRect();if(r.top<b.top+36||r.bottom>b.bottom-10)db.scrollTop+=r.top-b.top-db.clientHeight/2;
+}
+function inspect(f,l,opt={}){
+  if(sel){sel.setStyle&&sel.setStyle(polyStyle())}sel=l;l.setStyle({color:'#ff7a00',weight:3,fillOpacity:Math.max(+$('pop').value,.5)});l.bringToFront&&l.bringToFront();
+  const p=f.properties||{};$('secInsp').classList.remove('closed');
+  $('insp').innerHTML='<dl>'+Object.entries(p).filter(([k])=>k!=='area_ha').map(([k,v])=>`<dt>${k}</dt><dd>${v===''?'-':v}</dd>`).join('')+`<dt>luas</dt><dd>${fmt(polyHa(f.geometry),2)} ha</dd></dl><div class="btnrow" style="display:flex;margin-top:10px"><button id="zf">Zoom ke poligon</button></div>`;
+  $('zf').onclick=()=>map.fitBounds(l.getBounds(),{maxZoom:17,paddingBottomRight:[20,drawerPad()],paddingTopLeft:[20,20]});
+  L.popup({className:'jp',maxWidth:280,autoPan:!opt.fit,autoPanPaddingBottomRight:[20,drawerPad()]}).setLatLng(opt.latlng||l.getBounds().getCenter()).setContent(popHtml(f)).openOn(map);
+  markRow(f);
+}
+async function syncShp(){
+  const my=++syncShp.n;
+  if(S.shp){map.removeLayer(S.shp);S.shp=null;sel=null}
+  if(!$('onShp').checked){$('shpSub').textContent='Dimatikan';return}
+  const y=ys[yi];busy('L-shp',true);
+  try{
+    const gj=await getShp(y);if(my!==syncShp.n)return;
+    S.shp=L.geoJSON(gj,{style:polyStyle,onEachFeature:(f,l)=>{
+      l.on('mouseover',()=>{if(l===sel)return;l.setStyle({weight:2.5,fillOpacity:Math.min(1,(+$('pop').value||.1)+.25)});$('hoverInfo').style.display='flex';$('hoverInfo').textContent=fmt(polyHa(f.geometry),2)+' ha · klik untuk detail'});
+      l.on('mouseout',()=>{if(l!==sel)l.setStyle(polyStyle());$('hoverInfo').style.display='none'});
+      l.on('click',e=>{L.DomEvent.stopPropagation(e);inspect(f,l,{latlng:e.latlng})});
+    }}).addTo(map);
+    if(!fitted){fitted=true;map.fitBounds(S.shp.getBounds())}
+    const ha=gj.features.reduce((s,f)=>s+polyHa(f.geometry),0);
+    $('shpSub').textContent=`${y} · ${fmt(gj.features.length)} poligon · ≈ ${fmt(ha,0)} ha`;
+    updInfo(ha,gj.features.length);setStat('Tahun '+y+' · '+fmt(gj.features.length)+' poligon');
+    restack();if(drawerMode==='attr')showAttr();
+    const nx=ys[(yi+1)%ys.length];getShp(nx).catch(()=>{});   // prefetch tahun berikutnya
+  }catch(e){showErr('Gagal memuat poligon '+y+'. '+e.message);setStat('')}
+  finally{if(my===syncShp.n)busy('L-shp',false)}
+}
+syncShp.n=0;
+['fillc','pop','pcol'].forEach(i=>$(i).addEventListener('input',()=>S.shp&&S.shp.eachLayer(l=>l!==sel&&l.setStyle(polyStyle()))));
+$('onShp').onchange=syncShp;
+$('zoomShp').onclick=()=>S.shp&&map.fitBounds(S.shp.getBounds());
+
+/* ---------- layer: pembanding ---------- */
+async function syncCmp(){
+  if(S.cmp){map.removeLayer(S.cmp);S.cmp=null}
+  if(!$('onCmp').checked){return}
+  busy('L-cmp',true);const y=$('cmpYear').value;
+  try{const gj=await getShp(y);if(!$('onCmp').checked)return;if(S.cmp)map.removeLayer(S.cmp);
+    S.cmp=L.geoJSON(gj,{style:{color:'#e11d48',weight:1.6,fill:false,dashArray:'5 3'},interactive:false}).addTo(map);restack()}
+  catch(e){showErr('Gagal memuat pembanding. '+e.message)}finally{busy('L-cmp',false);legend()}
+}
+$('onCmp').onchange=()=>{syncCmp();legend()};$('cmpYear').onchange=syncCmp;
+
+/* ---------- layer: perubahan & hotspot ---------- */
+let chgData=null,chgCards='';
+const chgCol={loss:'#c0392b',gain:'#2f7d4f',other:'#888'};
+async function loadChg(){
+  if(chgData)return chgData;
+  const gj=await loadShp(CFG.shpPerubahan);const agg={loss:[0,0],gain:[0,0],other:[0,0]};
+  gj.features.forEach(f=>{const k=f._k=chgClass(f.properties);f._ha=polyHa(f.geometry);agg[k][0]+=f._ha;agg[k][1]++});
+  return chgData={gj,agg};
+}
+async function syncChg(){
+  if(S.chg){map.removeLayer(S.chg);S.chg=null}
+  if(!$('onChg').checked){legend();return}
+  busy('L-chg',true);setStat('Memuat perubahan (±12 ribu poligon)…');
+  try{
+    const {gj}=await loadChg();if(!$('onChg').checked)return;
+    const show=f=>f._k==='loss'?$('showLoss').checked:f._k==='gain'?$('showGain').checked:true;
+    S.chg=L.geoJSON(gj,{filter:show,style:f=>({color:chgCol[f._k],weight:.6,fillColor:chgCol[f._k],fillOpacity:+$('opChg').value}),
+      onEachFeature:(f,l)=>l.on('click',e=>{L.DomEvent.stopPropagation(e);L.popup().setLatLng(e.latlng).setContent(propsHtml(f)).openOn(map)})}).addTo(map);restack();
+    if(!fitted){fitted=true;map.fitBounds(S.chg.getBounds())}
+    setStat('Perubahan 2017–2024 ditampilkan');updInfo();
+  }catch(e){showErr('Shapefile perubahan gagal dimuat. '+e.message);setStat('')}finally{busy('L-chg',false);legend()}
+}
+$('onChg').onchange=syncChg;$('showLoss').onchange=syncChg;$('showGain').onchange=syncChg;
+$('opChg').oninput=()=>S.chg&&S.chg.setStyle(f=>({color:chgCol[f._k],weight:.6,fillColor:chgCol[f._k],fillOpacity:+$('opChg').value}));
+
+let hotRows=[];
+async function syncHot(){
+  if(S.hot){map.removeLayer(S.hot);S.hot=null}
+  if(!$('onHot').checked){legend();return}
+  busy('L-hot',true);
+  try{
+    const {gj}=await loadChg();if(!$('onHot').checked)return;
+    let fs=gj.features.filter(f=>f._k==='loss');const usedAll=!fs.length;if(usedAll)fs=gj.features;
+    const cell=.01,g={};fs.forEach(f=>{const b=geomCenter(f.geometry),k=Math.floor(b[0]/cell)+'_'+Math.floor(b[1]/cell);g[k]=(g[k]||0)+f._ha});
+    const ent=Object.entries(g).sort((a,b)=>b[1]-a[1]),vals=ent.map(e=>e[1]).sort((a,b)=>a-b),q=p=>vals[Math.floor(p*(vals.length-1))];
+    const ramp=['#fee5d9','#fcae91','#fb6a4a','#de2d26','#a50f15'],cl=v=>ramp[v>=q(.9)?4:v>=q(.75)?3:v>=q(.5)?2:v>=q(.25)?1:0];
+    hotRows=ent.slice(0,10).map(([k,v],i)=>{const[x,y]=k.split('_').map(Number);return{i:i+1,lat:(y+.5)*cell,lng:(x+.5)*cell,ha:v}});
+    S.hot=L.featureGroup(ent.map(([k,v])=>{const[x,y]=k.split('_').map(Number);return L.rectangle([[y*cell,x*cell],[(y+1)*cell,(x+1)*cell]],{weight:.5,color:'#7a1010',fillColor:cl(v),fillOpacity:+$('opHot').value}).bindPopup(`${v.toFixed(1)} ha ${usedAll?'(semua fitur)':'hilang'} di sel ini`)})).addTo(map);restack();
+    if(!fitted){fitted=true;map.fitBounds(S.hot.getBounds())}
+  }catch(e){showErr('Hotspot gagal dihitung. '+e.message)}finally{busy('L-hot',false);legend()}
+}
+$('onHot').onchange=syncHot;
+$('opHot').oninput=()=>S.hot&&S.hot.eachLayer(l=>l.setStyle({fillOpacity:+$('opHot').value}));
+$('topBtn').onclick=async()=>{if(!$('onHot').checked){$('onHot').checked=true;$('L-hot').classList.remove('off');await syncHot()}showTop()};
+
+/* ---------- ringkasan + grafik mini ---------- */
+let spark=null;
+function updInfo(ha,n){
+  const y=ys[yi],r=rows.find(x=>x.tahun===y);
+  if(ha!=null){updInfo.ha=ha;updInfo.n=n}
+  $('mini').innerHTML=
+    `<div><b>${y}</b><span>Tahun terpilih</span></div>`+
+    `<div><b>${updInfo.n!=null&&$('onShp').checked?fmt(updInfo.n):'-'}</b><span>Poligon hasil peta</span></div>`+
+    `<div><b>${updInfo.ha!=null&&$('onShp').checked?fmt(updInfo.ha,0)+' ha':'-'}</b><span>Luas dari shapefile</span></div>`+
+    `<div><b>${r?fmt(r.sawah_ha,0)+' ha':'-'}</b><span>Sawah (statistik resmi)</span></div>`+
+    (chgData?`<div class="neg"><b>−${fmt(chgData.agg.loss[0],0)} ha</b><span>Hilang 2017–2024</span></div><div class="pos"><b>+${fmt(chgData.agg.gain[0],0)} ha</b><span>Bertambah 2017–2024</span></div>`:'');
+  if(!rows.length||!window.Chart)return;
+  const col=rows.map(x=>x.tahun===y?'#2f7d4f':'#bcd6c5');
+  if(!spark){spark=new Chart($('spark'),{type:'bar',data:{labels:rows.map(x=>x.tahun),datasets:[{data:rows.map(x=>x.sawah_ha),backgroundColor:col,borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:250},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmt(c.parsed.y,0)+' ha'}}},
+      scales:{y:{beginAtZero:false,ticks:{font:{size:10},callback:v=>fmt(v/1000,0)+'k'}},x:{ticks:{font:{size:10}},grid:{display:false}}},onClick:(e,els)=>{if(els.length)goYear(els[0].index)}}})}
+  else{spark.data.datasets[0].backgroundColor=col;spark.update()}
+}
+
+/* ---------- legenda ---------- */
+function legend(){
+  const a=[];
+  if($('onShp').checked)a.push('<div><i class="ln"></i>Batas lahan pertanian '+ys[yi]+'</div><div><i style="background:'+$('pcol').value+';opacity:.7"></i>Isi poligon</div>');
+  if($('onCmp').checked)a.push('<div><i class="ln d"></i>Batas '+$('cmpYear').value+' (pembanding)</div>');
+  if($('onChg').checked)a.push('<div><i style="background:#c0392b"></i>Lahan hilang</div><div><i style="background:#2f7d4f"></i>Lahan bertambah</div>');
+  if($('onHot').checked)a.push('<div><i style="background:linear-gradient(90deg,#fee5d9,#fb6a4a,#a50f15)"></i>Hotspot: rendah → tinggi</div>');
+  $('legend').style.display=a.length?'flex':'none';$('legend').innerHTML='<b>Legenda</b>'+a.join('');
+}
+['onShp','pcol'].forEach(i=>$(i).addEventListener('change',legend));$('pcol').addEventListener('input',legend);
+
+/* ---------- laci tabel (atribut / sel teratas) ---------- */
+let drawerMode='';
+function openDrawer(){$('drawer').classList.add('show')}
+$('dClose').onclick=()=>{$('drawer').classList.remove('show');drawerMode=''};
+function showAttr(){
+  const gj=KGEO['p'+ys[yi]];if(!gj){return}drawerMode='attr';
+  const f=gj.features,c=[...new Set(f.flatMap(x=>Object.keys(x.properties||{})))],ar=f.map(x=>polyHa(x.geometry));
+  let order=f.map((_,i)=>i),sk=null,sd=1;
+  const val=(i,k)=>k==='#'?i:k==='luas (ha)'?ar[i]:(f[i].properties[k]??'');
+  $('dTitle').textContent='Tabel atribut '+ys[yi];$('dSub').textContent=fmt(f.length)+' baris · klik baris: pilih poligon + popup · klik judul kolom: urutkan';
+  const draw=()=>{
+    $('dBody').innerHTML='<table><tr>'+['#',...c,'luas (ha)'].map(k=>`<th data-k="${k}" class="${k===sk?(sd>0?'s-asc':'s-desc'):''}">${k}</th>`).join('')+'</tr>'+
+      order.map(i=>`<tr data-i="${i}" style="cursor:pointer"><td>${i+1}</td>${c.map(k=>`<td>${f[i].properties[k]??''}</td>`).join('')}<td>${fmt(ar[i],2)}</td></tr>`).join('')+'</table>';
+    if(sel&&sel.feature)markRow(sel.feature);
+  };
+  $('dBody').onclick=e=>{
+    const th=e.target.closest('th[data-k]');
+    if(th){const k=th.dataset.k;sd=sk===k?-sd:1;sk=k;
+      order.sort((a,b)=>{const x=val(a,k),y=val(b,k);return(typeof x==='number'&&typeof y==='number'?x-y:String(x).localeCompare(String(y),'id',{numeric:true}))*sd});draw();return}
+    const tr=e.target.closest('tr[data-i]');if(!tr||!S.shp)return;const ft=f[+tr.dataset.i];
+    S.shp.eachLayer(l=>{if(l.feature===ft){inspect(ft,l,{fit:true});map.fitBounds(l.getBounds(),{maxZoom:17,paddingBottomRight:[20,drawerPad()],paddingTopLeft:[20,20]})}});
+  };
+  draw();openDrawer();
+}
+function showTop(){
+  drawerMode='top';$('dTitle').textContent='10 sel (±1 km) dengan kehilangan terbesar';$('dSub').textContent='klik baris untuk zoom';
+  $('dBody').innerHTML='<table><tr><th>#</th><th>Koordinat tengah sel</th><th>Luas (ha)</th></tr>'+hotRows.map(r=>`<tr data-la="${r.lat}" data-ln="${r.lng}" style="cursor:pointer"><td>${r.i}</td><td>${r.lat.toFixed(4)}, ${r.lng.toFixed(4)}</td><td>${r.ha.toFixed(1)}</td></tr>`).join('')+'</table>';
+  $('dBody').onclick=e=>{const tr=e.target.closest('tr[data-la]');if(tr)map.setView([+tr.dataset.la,+tr.dataset.ln],14)};
+  openDrawer();
+}
+const openTbl=()=>{if(!$('onShp').checked){$('onShp').checked=true;$('L-shp').classList.remove('off');syncShp().then(showAttr)}else showAttr()};
+$('tblBtn').onclick=openTbl;$('tblFab').onclick=openTbl;
+
+/* ---------- mulai ---------- */
+legend();
+loadCSV(CFG.csv).then(r=>{rows=r.sort((a,b)=>a.tahun-b.tahun);updInfo()}).catch(()=>{});
+(async()=>{
+  if(location.hash==='#perubahan'){$('onChg').checked=true;$('L-chg').classList.remove('off','closed');$('L-chg').classList.add('open');syncChg()}
+  refreshYear();
+})();
+</script>
+</body></html>

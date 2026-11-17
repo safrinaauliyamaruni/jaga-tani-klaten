@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bandingkan - Jaga Tani</title>
+<link rel="stylesheet" href="css/style.css"><link rel="stylesheet" href="lib/leaflet.css">
+<script src="lib/leaflet.js"></script><script src="lib/papaparse.min.js"></script>
+<script src="js/klaten-data.js"></script><script src="js/common.js"></script><script src="js/geo.js"></script>
+</head><body class="mappage">
+<div class="app" id="app">
+<aside class="panel">
+  <div class="ph"><h1>Bandingkan Dua Tahun</h1><p>Dua peta tersinkron: geser atau zoom satu, yang lain mengikuti.</p></div>
+
+  <section class="sec"><button class="sh">Tahun <span class="chev">▾</span></button><div class="sb">
+    <div class="lopt" style="display:block;border:0;padding:0">
+      <div class="r c" style="margin-top:0"><span>Kiri</span><select id="ya"></select></div>
+      <div class="r c"><span>Kanan</span><select id="yb"></select></div>
+      <div class="btnrow"><button id="swap">⇄ Tukar kiri/kanan</button></div>
+    </div></div></section>
+
+  <section class="sec"><button class="sh">Layer <span class="chev">▾</span></button><div class="sb">
+    <div class="layer" id="L-shp">
+      <div class="lh"><label class="sw"><input type="checkbox" id="vec" checked><i></i></label>
+        <div class="nm" data-for="vec">Lahan pertanian<small>Poligon hasil klasifikasi</small></div><span class="spin"></span>
+        <button class="tg" aria-label="Pengaturan layer">▾</button></div>
+      <div class="lopt">
+        <div class="r"><span>Opasitas isi</span><input type="range" id="pop" min="0.05" max="1" step=".05" value=".4"><output>40%</output></div>
+        <div class="r c"><span>Warna isi</span><input type="color" id="pcol" value="#2f7d4f"></div>
+      </div></div>
+  </div></section>
+
+  <section class="sec"><button class="sh">Selisih kedua tahun <span class="chev">▾</span></button><div class="sb">
+    <div class="mini" id="mini"></div>
+    <div class="hint" id="diffNote"></div>
+  </div></section>
+</aside>
+
+<div class="cmpgrid">
+  <div class="mapwrap"><div id="ma" style="position:absolute;inset:0"></div><div class="fab tl pill" id="ta" style="font-size:18px;font-weight:800"></div></div>
+  <div class="mapwrap"><div id="mb" style="position:absolute;inset:0"></div><div class="fab tl pill" id="tb" style="font-size:18px;font-weight:800"></div></div>
+  <button class="mobtoggle" id="mobToggle">☰ Layer</button>
+</div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id),ys=CFG.years;
+document.querySelectorAll('.sec>.sh').forEach(b=>b.onclick=()=>b.parentNode.classList.toggle('closed'));
+document.querySelectorAll('.layer .tg').forEach(b=>b.onclick=()=>b.closest('.layer').classList.toggle('open'));
+document.querySelectorAll('.layer .nm').forEach(n=>n.onclick=()=>{const c=$(n.dataset.for);c.checked=!c.checked;c.dispatchEvent(new Event('change'))});
+[['vec','L-shp']].forEach(([c,l])=>$(c).addEventListener('change',()=>$(l).classList.toggle('off',!$(c).checked)));
+const pctOut=(inp,f)=>{const o=inp.parentNode.querySelector('output');const u=()=>o.textContent=f(+inp.value);u();inp.addEventListener('input',u)};
+pctOut($('pop'),v=>Math.round(v*100)+'%');
+$('mobToggle').onclick=()=>$('app').classList.add('pn-open');
+
+[ya,yb].forEach(s=>ys.forEach(y=>s.add(new Option(y,y))));ya.value=ys[0];yb.value=ys[ys.length-1];
+
+const BASES=()=>({'Jalan':L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}),
+  'Satelit':L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Esri'})});
+const K=['a','b'],M={},B={},baseL={},LY={a:{},b:{}},Y={a:ya,b:yb},tk={a:0,b:0};
+K.forEach(k=>{M[k]=L.map('m'+k,{preferCanvas:true,zoomControl:false,minZoom:8}).setView(CFG.center,CFG.zoom);
+  L.control.zoom({position:'topright'}).addTo(M[k]);B[k]=BASES();baseL[k]=B[k]['Jalan'].addTo(M[k]);});
+/* ikon layer di bawah zoom (peta kanan); mengganti peta dasar kedua peta sekaligus */
+L.control.layers(B.b,null,{position:'topright',collapsed:true}).addTo(M.b);
+M.b.on('baselayerchange',e=>{baseL.b=e.layer;e.layer.bringToBack();
+  const nm=Object.keys(B.b).find(n=>B.b[n]===e.layer);M.a.removeLayer(baseL.a);baseL.a=B.a[nm].addTo(M.a);baseL.a.bringToBack()});
+let lock=0;const sync=(f,t)=>f.on('move',()=>{if(lock)return;lock=1;t.setView(f.getCenter(),f.getZoom(),{animate:false});lock=0});sync(M.a,M.b);sync(M.b,M.a);
+let fit=0,rows=[];const info={a:null,b:null};
+
+async function drawShp(k){
+  const t=++tk[k],y=+Y[k].value;if(LY[k].shp){M[k].removeLayer(LY[k].shp);LY[k].shp=null}
+  if(!$('vec').checked){info[k]=null;upd();return}
+  $('L-shp').classList.add('loading');
+  try{const gj=await getShp(y);if(t!==tk[k])return;
+    LY[k].shp=L.geoJSON(gj,{style:{color:'#ffd400',weight:1,fillColor:$('pcol').value,fillOpacity:+$('pop').value},
+      onEachFeature:(f,l)=>l.bindTooltip(fmt(polyHa(f.geometry),2)+' ha',{sticky:true,className:'jt'})}).addTo(M[k]);
+    info[k]={n:gj.features.length,ha:gj.features.reduce((s,f)=>s+polyHa(f.geometry),0)};
+    if(!fit){fit=1;M.a.fitBounds(LY[k].shp.getBounds())}upd()
+  }catch(e){showErr('Gagal memuat '+y+'. '+e.message)}finally{if(t===tk[k])$('L-shp').classList.remove('loading')}
+}
+function upd(){
+  ta.textContent=ya.value;tb.textContent=yb.value;
+  const g=y=>rows.find(r=>r.tahun==y),A=g(ya.value),Bq=g(yb.value);
+  const dS=A&&Bq?Bq.sawah_ha-A.sawah_ha:null,cls=dS==null?'':dS<0?'neg':'pos';
+  $('mini').innerHTML=
+    `<div><b>${info.a?fmt(info.a.ha,0)+' ha':'-'}</b><span>Luas peta ${ya.value}</span></div><div><b>${info.b?fmt(info.b.ha,0)+' ha':'-'}</b><span>Luas peta ${yb.value}</span></div>`+
+    `<div><b>${A?fmt(A.sawah_ha,0)+' ha':'-'}</b><span>Sawah resmi ${ya.value}</span></div><div><b>${Bq?fmt(Bq.sawah_ha,0)+' ha':'-'}</b><span>Sawah resmi ${yb.value}</span></div>`+
+    (dS!=null?`<div class="${cls}" style="grid-column:1/-1"><b>${dS>0?'+':''}${fmt(dS,0)} ha</b><span>Selisih sawah statistik resmi ${ya.value} → ${yb.value}</span></div>`:'');
+  $('diffNote').textContent=info.a&&info.b?`Poligon: ${fmt(info.a.n)} → ${fmt(info.b.n)}. Hasil peta dan statistik resmi memakai definisi berbeda, jadi bandingkan arah perubahannya.`:'';
+}
+const all=()=>{drawShp('a');drawShp('b');upd()};
+[ya,yb].forEach(e=>e.onchange=all);$('vec').onchange=()=>{drawShp('a');drawShp('b')};
+$('swap').onclick=()=>{const t=ya.value;ya.value=yb.value;yb.value=t;all()};
+['pop','pcol'].forEach(i=>$(i).addEventListener('input',()=>K.forEach(k=>LY[k].shp&&LY[k].shp.setStyle({fillColor:$('pcol').value,fillOpacity:+$('pop').value}))));
+loadCSV(CFG.csv).then(r=>{rows=r;upd()}).catch(()=>{});
+all();
+</script>
+</body></html>

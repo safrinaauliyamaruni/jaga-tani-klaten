@@ -1,0 +1,73 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Jaga Tani — Pantau Alih Fungsi Lahan Pertanian Klaten</title><link rel="stylesheet" href="css/style.css"><script>document.documentElement.classList.add("js")</script>
+<script src="lib/papaparse.min.js"></script><script src="lib/chart.umd.min.js"></script><script src="js/klaten-data.js"></script><script src="js/common.js"></script></head><body><main>
+
+<section class="hero">
+  <div>
+    <span class="eyebrow">Kabupaten Klaten · 2017–2024</span>
+    <h1>Jaga Tani: pantau sawah yang berkurang, lihat di mana</h1>
+    <p>Klaten berada di koridor Solo–Yogyakarta, wilayah yang berkembang cepat. Jaga Tani menunjukkan berapa banyak lahan pertanian yang berkurang dan di mana, memakai statistik resmi dan peta hasil klasifikasi citra Sentinel-2.</p>
+    <a class="btn" href="peta.html">Buka peta interaktif</a><a class="btn alt" href="materi.html">Baca materi dasar</a>
+  </div>
+  <div class="stats" id="heroStats"></div>
+</section>
+
+<section class="showcase" aria-label="Foto petani">
+  <figure class="rv"><img src="img/petani-1.jpg" alt="Petani berjalan di tengah hamparan padi hijau, difoto dari udara" loading="eager"><figcaption><b>Setiap petak punya cerita</b><span>Padi yang hijau hari ini bisa jadi bangunan besok.</span></figcaption></figure>
+  <figure class="rv" style="--d:.15s"><img src="img/petani-2.jpg" alt="Petani bercaping menyusuri sawah yang menguning" loading="eager"><figcaption><b>Di balik data, ada petani</b><span>Memantau lahan berarti menjaga sumber pangan dan penghidupan.</span></figcaption></figure>
+</section>
+
+<h2 class="rv" style="margin-top:0">Total lahan pertanian</h2>
+<p class="sub">Data berasal dari DKPP, LPPD, Statistik Sektoral, BPS, dan RPJMD. Rincian sumber per tahun ada di halaman <a href="data.html">Data</a>.</p>
+<div class="grid four" id="cards"></div>
+<div class="two"><div class="card ch-card"><canvas id="c1"></canvas></div><div class="card ch-card"><canvas id="c2"></canvas></div></div>
+
+<h2 class="rv">Mau lihat apa?</h2>
+<div class="tiles" id="tiles">
+<a class="tile" href="peta.html"><span class="ic">🗺️</span><b>Peta</b><span class="d">Peta interaktif dengan panel layer: citra Sentinel-2, lahan pertanian per tahun, perubahan, dan hotspot.</span></a>
+<a class="tile" href="bandingkan.html"><span class="ic">◧</span><b>Bandingkan</b><span class="d">Dua peta berdampingan untuk dua tahun yang kamu pilih.</span></a>
+<a class="tile" href="spasiotemporal.html"><span class="ic">🎞️</span><b>Spasiotemporal</b><span class="d">Animasi dan peta berseri luas lahan pertanian dari tahun ke tahun.</span></a>
+<a class="tile" href="dashboard.html"><span class="ic">📈</span><b>Dashboard</b><span class="d">Laju perubahan per tahun, dan perbandingan statistik dengan hasil peta.</span></a>
+<a class="tile" href="materi.html"><span class="ic">📚</span><b>Materi</b><span class="d">Latar belakang alih fungsi lahan di Klaten, dirangkum dari jurnal dan skripsi.</span></a>
+<a class="tile" href="data.html"><span class="ic">🗂️</span><b>Data</b><span class="d">Tabel lengkap statistik, bisa diunduh sebagai CSV.</span></a>
+</div>
+
+<script>
+(async()=>{try{
+ const R=(await loadCSV(CFG.csv)).sort((a,b)=>a.tahun-b.tahun),a=R[0],z=R.at(-1),ys=R.map(r=>r.tahun),d=z.sawah_ha-a.sawah_ha;
+ heroStats.innerHTML=`<div class="stat"><b>${fmt(a.sawah_ha,0)} ha</b><span>Sawah ${a.tahun}</span></div><div class="stat"><b>${fmt(z.sawah_ha,0)} ha</b><span>Sawah ${z.tahun}</span></div>`+
+  `<div class="stat wide"><b>${fmt(d,0)} ha (${fmt(d/a.sawah_ha*100,1)} %)</b><span>Perubahan sawah ${a.tahun}–${z.tahun} menurut statistik resmi</span></div>`;
+ const c=(k,v,sub='',cl='')=>`<div class="card"><div class="k">${k}</div><div class="v ${cl}">${v}</div>${sub?`<div class="s ${cl}">${sub}</div>`:''}</div>`,dt=z.total_ha-a.total_ha;
+ cards.innerHTML=c('Total pertanian '+a.tahun,fmt(a.total_ha,0)+' ha','Sawah + bukan sawah')+c('Total pertanian '+z.tahun,fmt(z.total_ha,0)+' ha','Sawah + tegal/kebun')+
+  c('Perubahan total',fmt(dt,0)+' ha',fmt(dt/a.total_ha*100,1)+' % sejak '+a.tahun,dt<0?'neg':'pos')+
+  (z.rpjmd_total_pertanian_ha?c('Snapshot spasial RPJMD '+z.tahun,fmt(z.rpjmd_total_pertanian_ha,0)+' ha','Dari dokumen RPJMD'):c('Bukan sawah '+z.tahun,fmt(z.bukan_sawah_ha,0)+' ha'));
+ const base={responsive:true,maintainAspectRatio:false};
+ new Chart(c1,{type:'bar',data:{labels:ys,datasets:[{label:'Sawah',data:R.map(r=>r.sawah_ha),backgroundColor:'#2f7d4f'},{label:'Bukan sawah / tegal-kebun',data:R.map(r=>r.bukan_sawah_ha),backgroundColor:'#e0a030'}]},
+  options:{...base,scales:{x:{stacked:true},y:{stacked:true}},plugins:{title:{display:true,text:'Luas lahan pertanian per kategori (ha)'},legend:{position:'bottom'}}}});
+ new Chart(c2,{type:'line',data:{labels:ys,datasets:[{label:'Sawah (DKPP/LPPD)',data:R.map(r=>r.sawah_ha),borderColor:'#2f7d4f'},{label:'Sawah (BPS)',data:R.map(r=>r.bps_sawah_ha),borderColor:'#2563a8',borderDash:[5,4]},
+  {label:'Total (DKPP/LPPD)',data:R.map(r=>r.total_ha),borderColor:'#e0a030'},{label:'Total (BPS)',data:R.map(r=>r.bps_total_ha),borderColor:'#c0392b',borderDash:[5,4]}]},options:{...base,plugins:{title:{display:true,text:'Seri DKPP/LPPD vs BPS (ha)'},legend:{position:'bottom'}}}});
+}catch(e){showErr('Gagal memuat CSV. '+e.message)}})();
+</script>
+<script>
+/* animasi: muncul saat di-scroll + hitung naik angka kartu */
+(()=>{
+ const els=[...document.querySelectorAll('.rv')];
+ document.querySelectorAll('#cards,.two,#tiles').forEach(e=>{e.classList.add('rv')});
+ document.querySelectorAll('#tiles .tile').forEach((t,i)=>{t.classList.add('rv');t.style.setProperty('--d',(i*.07)+'s');t.addEventListener('transitionend',()=>{t.classList.remove('rv','in');t.style.removeProperty('--d')},{once:true})});
+ const all=[...document.querySelectorAll('.rv')];
+ if(!('IntersectionObserver' in window)){all.forEach(e=>e.classList.add('in'));return}
+ const io=new IntersectionObserver(es=>es.forEach(en=>{if(en.isIntersecting){en.target.classList.add('in');io.unobserve(en.target)}}),{threshold:.12});
+ all.forEach(e=>io.observe(e));
+ /* count-up untuk angka di hero */
+ const parse=t=>{const m=t.match(/^([−\-+]?)([\d.,]+)(.*)$/);return m};
+ const run=()=>document.querySelectorAll('.hero .stat b').forEach(b=>{
+  const m=parse(b.textContent.trim());if(!m)return;const raw=m[2],dec=raw.includes(',')?raw.split(',')[1].length:0,
+  target=parseFloat(raw.replace(/\./g,'').replace(',','.'));if(isNaN(target))return;
+  if(matchMedia('(prefers-reduced-motion:reduce)').matches)return;
+  const t0=performance.now(),D=1200,fmtN=v=>v.toLocaleString('id-ID',{minimumFractionDigits:dec,maximumFractionDigits:dec});
+  const tail=m[3];const step=n=>{const k=Math.min(1,(n-t0)/D),e=1-Math.pow(1-k,3);b.textContent=m[1]+fmtN(target*e)+tail;if(k<1)requestAnimationFrame(step)};requestAnimationFrame(step)});
+ const obs=new MutationObserver(()=>{if(document.querySelector('.hero .stat b')){obs.disconnect();run()}});
+ obs.observe(document.getElementById('heroStats'),{childList:true});
+})();
+</script>
+</main></body></html>

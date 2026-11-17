@@ -1,0 +1,44 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Spasiotemporal - Jaga Tani</title><link rel="stylesheet" href="css/style.css">
+<script src="js/klaten-data.js"></script><script src="js/common.js"></script></head><body><main>
+<h1>Visual Spasiotemporal Lahan Pertanian</h1>
+<p class="sub">Dua cara melihat luas lahan pertanian Klaten dari tahun ke tahun, lewat animasi dan peta berseri.</p>
+
+<div class="legend card" style="padding:12px 16px;margin-bottom:16px"><b style="font-size:13px">Luas lahan per hektar</b>
+<span><i style="background:#edf8e9"></i>Sangat rendah</span><span><i style="background:#bae4b3"></i>Rendah</span><span><i style="background:#74c476"></i>Sedang</span><span><i style="background:#31a354"></i>Tinggi</span><span><i style="background:#006d2c"></i>Sangat tinggi</span></div>
+
+<div class="vz">
+  <section class="card" id="anim">
+    <div class="vh"><span class="ic">🎞️</span><div><b>Animasi perubahan</b><small>Tahun 2016 sampai 2023</small></div></div>
+    <div class="stage" id="stage">
+      <img id="gif" src="img/animasi-poster.png" alt="Animasi luas lahan pertanian Kabupaten Klaten 2016 sampai 2023" width="640" height="480">
+      <button class="playbtn" id="play" aria-label="Putar animasi">▶</button>
+      <div class="loadmsg" id="msg" hidden>Memuat animasi, tunggu sebentar…</div>
+    </div>
+    <div class="vf"><div class="tags"><span>Berulang</span><span>±27 MB</span></div><span class="sp"></span><a href="img/animasi-lahan.gif" download>⬇ Unduh GIF</a></div>
+  </section>
+
+  <section class="card" id="seri">
+    <div class="vh"><span class="ic">🗺️</span><div><b>Peta berseri</b><small>Tahun 2017 sampai 2024, klik untuk memperbesar</small></div></div>
+    <div class="stage"><img class="zoomable" id="seriImg" src="img/peta-spasiotemporal.jpg" alt="Peta luas lahan pertanian Klaten 2017 sampai 2024, delapan panel" loading="lazy"></div>
+    <div class="vf"><div class="tags"><span>8 panel</span><span>Sentinel-2 10 m</span></div><span class="sp"></span><a href="img/peta-spasiotemporal.jpg" download>⬇ Unduh JPG</a></div>
+  </section>
+</div>
+
+<p class="src">Peta dibuat di Laboratorium Kartografi, Departemen Sains Informasi Geografi, Fakultas Geografi UGM. Untuk melihat batas poligon dan citra secara interaktif, buka <a href="peta.html">halaman Peta</a>.</p>
+
+<div class="lb" id="lb" role="dialog" aria-label="Peta diperbesar"><button class="x" aria-label="Tutup">✕</button><img id="lbImg" alt=""></div>
+<script>
+const $=id=>document.getElementById(id);
+/* GIF besar, jadi baru dimuat saat tombol ditekan */
+$('play').onclick=()=>{
+  const b=$('play'),m=$('msg'),g=$('gif'),n=new Image();
+  b.hidden=true;m.hidden=false;
+  n.onload=()=>{g.src=n.src;m.hidden=true};
+  n.onerror=()=>{m.textContent='Animasi gagal dimuat. Coba unduh berkasnya.';b.hidden=false};
+  n.src='img/animasi-lahan.gif';
+};
+const lb=$('lb'),close=()=>lb.classList.remove('on');
+$('seriImg').onclick=e=>{$('lbImg').src=e.target.src;$('lbImg').alt=e.target.alt;lb.classList.add('on')};
+lb.onclick=close;addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+</script></main></body></html>

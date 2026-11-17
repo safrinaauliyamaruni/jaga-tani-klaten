@@ -1,0 +1,9 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Data - Jaga Tani</title><link rel="stylesheet" href="css/style.css"><script src="lib/papaparse.min.js"></script><script src="js/klaten-data.js"></script><script src="js/common.js"></script></head><body><main>
+<h1>Data Tabel</h1><p class="sub">Tabel statistik luas lahan pertanian (satu berkas CSV).</p>
+<div class="card scroll" id="t1"></div><div class="bar noprint" style="margin-top:12px"><button id="dl">⬇ Unduh CSV</button></div>
+<script>
+const link=(k,v)=>v==null?'':k==='url_sumber'?`<a href="${v}" target="_blank" rel="noopener">dokumen</a>`:v;
+loadCSV(CFG.csv).then(R=>{const cols=Object.keys(R[0]);t1.innerHTML=`<table><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr>${R.map(r=>`<tr>${cols.map(c=>`<td>${link(c,r[c])}</td>`).join('')}</tr>`).join('')}</table>`;
+ dl.onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+Papa.unparse(R)],{type:'text/csv'}));a.download='Tabel_Luas_Lahan_Pertanian_Klaten_2017_2024.csv';a.click()}}).catch(e=>showErr(e.message));
+</script></main></body></html>

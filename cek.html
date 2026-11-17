@@ -1,0 +1,19 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cek Path - Jaga Tani</title><link rel="stylesheet" href="css/style.css"><script src="lib/papaparse.min.js"></script><script src="js/klaten-data.js"></script><script src="js/common.js"></script></head><body><main>
+<h1>Cek Path Data</h1><p class="sub">Poligon (geo/*.js) wajib ada.</p>
+<div class="card"><div class="k">Halaman ini dilayani dari</div><div class="v" style="font-size:16px;word-break:break-all" id="loc"></div><div class="sub" id="hint"></div></div>
+<div class="bar noprint" style="margin-top:12px"><button id="run">Cek ulang</button><span id="sum"></span></div>
+<div class="card scroll"><table><thead><tr><th>Status</th><th>Berkas</th><th>URL yang dicoba</th><th>Ukuran</th></tr></thead><tbody id="tb"></tbody></table></div>
+<script>
+loc.textContent=location.href.replace(/[^\/]*$/,'');
+const list=['geo/chg.js',...CFG.years.map(y=>'geo/p'+y+'.js')];
+async function probe(p){for(const q of [p,p.replace(/^data\//,'')]){try{let r=await fetch(q,{method:'HEAD'});if(!r.ok)r=await fetch(q,{headers:{Range:'bytes=0-0'}});
+  if(r.ok||r.status===206){const n=r.headers.get('content-length')||'';return{ok:1,q,n}}}catch(e){}}return{ok:0,q:new URL(p,location.href).href}}
+async function cekUlang(){tb.innerHTML='';let ok=0,csvOk=0;const rows=await Promise.all(list.map(async p=>({p,...await probe(p)})));
+ rows.forEach(r=>{if(r.ok)ok++;tb.insertAdjacentHTML('beforeend',`<tr><td>${r.ok?'✅':'❌'}</td><td>${r.p.split('/').pop()}</td><td style="font-size:12px">${r.q}</td><td>${r.n?fmt(r.n/1048576,1)+' MB':''}</td></tr>`)});
+ sum.textContent=`${ok} dari ${list.length} berkas ditemukan`;
+ const missGeo=rows.filter(r=>!r.ok&&r.p.startsWith('geo/')).length,missAll=missGeo>0;
+ hint.innerHTML=missAll?'<b style="color:#c0392b">Folder geo/ tidak lengkap.</b> Folder <code>geo/</code> harus ada di samping index.html (lihat alamat di atas). Pakai seluruh isi folder klaten_web.':
+  ok===list.length?'<b style="color:#2f7d4f">Semua berkas ditemukan.</b>':''}
+cekUlang();document.getElementById("run").onclick=cekUlang;
+</script></main></body></html>

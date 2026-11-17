@@ -1,0 +1,66 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dashboard - Jaga Tani</title><link rel="stylesheet" href="css/style.css">
+<script src="lib/papaparse.min.js"></script><script src="lib/chart.umd.min.js"></script><script src="js/klaten-data.js"></script><script src="js/common.js"></script><script src="js/geo.js"></script></head><body><main>
+<h1>Dashboard Perubahan Lahan Pertanian</h1><p class="sub">Tren luas dari hasil peta, lalu perbandingannya dengan statistik resmi.</p>
+<h2 style="margin-top:0">Tren &amp; perubahan luas</h2>
+<p class="sub">Dihitung dari poligon hasil peta (Sentinel-2), bukan dari statistik administratif. Arahkan kursor ke grafik untuk melihat angka. Grafik beranimasi saat muncul di layar.</p>
+<div class="bar noprint"><label>Tahun dasar <select id="base"></select></label><label><input type="checkbox" id="zero" checked> Sumbu luas mulai dari 0</label><button id="replay">Putar ulang animasi</button></div>
+<div class="tr">
+<div class="card"><div class="ch"><canvas id="t1"></canvas></div></div>
+<div class="card"><div class="ch"><canvas id="t2"></canvas></div></div>
+<div class="card"><div class="ch"><canvas id="t3"></canvas></div></div>
+<div class="card"><div class="ch"><canvas id="t4"></canvas></div></div>
+<div class="card"><div class="ch"><canvas id="t5"></canvas></div></div>
+</div>
+<p class="sub">Bertambah dan berkurang per periode adalah perkiraan dari tumpang-tindih poligon dua tahun berurutan; selisih bersihnya sama dengan perubahan luas total.</p>
+<h2>Perbandingan dengan hasil peta (shapefile)</h2>
+<div class="card"><div class="bar" style="border:0;padding:0"><button id="gbtn">Hitung luas dari shapefile 2017-2024</button><span id="gst" class="sub"></span></div><canvas id="c4" height="90"></canvas><div class="scroll" id="gtab"></div>
+<p class="sub">Hasil peta (klasifikasi Sentinel-2/Dynamic World) dan statistik administratif memakai definisi dan basis pendataan berbeda, jadi selisih angkanya wajar. Bandingkan arah tren, bukan angka mutlak.</p></div>
+<h2>Keterbandingan data per tahun</h2><div class="card scroll" id="stat"></div>
+<script>
+(async()=>{try{
+const R=(await loadCSV(CFG.csv)).sort((a,b)=>a.tahun-b.tahun),ys=R.map(r=>r.tahun),S=R.map(r=>r.sawah_ha),n=S.length-1;
+stat.innerHTML='<table><tr><th>Tahun</th><th>Sawah (ha)</th><th>Bukan sawah (ha)</th><th>Total (ha)</th><th>Status keterbandingan</th></tr>'+R.map(r=>`<tr><td>${r.tahun}</td><td>${fmt(r.sawah_ha,1)}</td><td>${fmt(r.bukan_sawah_ha,1)}</td><td>${fmt(r.total_ha,1)}</td><td style="white-space:normal">${r.status_keterbandingan||''}</td></tr>`).join('')+'</table>';
+let ch4;gbtn.onclick=async()=>{gbtn.disabled=true;const out=[];
+ for(const y of CFG.years){gst.textContent='Menghitung '+y+'…';try{const gj=await loadShp(CFG.shpPertanian(y));out.push({y,n:gj.features.length,ha:gj.features.reduce((s,f)=>s+polyHa(f.geometry),0)})}catch(e){showErr(e.message);gst.textContent='';gbtn.disabled=false;return}}
+ gst.textContent='Selesai.';if(ch4)ch4.destroy();
+ ch4=new Chart(c4,{type:'line',data:{labels:ys,datasets:[{label:'Hasil peta (shapefile)',data:out.map(o=>o.ha),borderColor:'#7a4b9e'},{label:'Statistik sawah',data:S,borderColor:'#2f7d4f'},{label:'Statistik total kategori',data:R.map(r=>r.total_ha),borderColor:'#e0a030'}]},options:{plugins:{title:{display:true,text:'Luas (ha), hasil peta vs statistik'}}}});
+ gtab.innerHTML='<table><tr><th>Tahun</th><th>Poligon</th><th>Luas dari shapefile (ha)</th><th>Rata-rata ha/poligon</th></tr>'+out.map(o=>`<tr><td>${o.y}</td><td>${fmt(o.n)}</td><td>${fmt(o.ha,0)}</td><td>${fmt(o.ha/o.n,1)}</td></tr>`).join('')+'</table>'};
+addEventListener('klaten:files',()=>{gbtn.disabled=false});
+}catch(e){showErr('Gagal memuat CSV. '+e.message)}})();
+</script>
+
+<script>
+(function(){
+const D={tahun:[2017,2018,2019,2020,2021,2022,2023,2024],luas:[26857.2,27464.3,26566.9,25862.4,24949.9,23525.8,24098.3,22738.6],gain:[1763,945,1160,1229,1181,2358,1108],loss:[1155,1842,1864,2141,2606,1786,2468]};
+const Y=D.tahun,L=D.luas,C={g:'#2a9d8f',r:'#e76f51',k:'#264653'},sg=v=>v>=0?C.g:C.r,S=v=>(v>0?'+':'')+fmt(v,1);
+if(matchMedia('(prefers-reduced-motion: reduce)').matches)Chart.defaults.animation=false;
+Y.slice(0,-1).forEach(y=>base.add(new Option(y,y)));
+const bi=()=>Y.indexOf(+base.value),idx=()=>L.map(v=>+(v/L[bi()]*100).toFixed(2)),cum=()=>L.map(v=>+(v-L[bi()]).toFixed(1));
+const stag=ms=>({duration:900,easing:'easeOutQuart',delay:c=>c.type==='data'&&c.mode==='default'?c.dataIndex*ms:0});
+const O=t=>({responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:t,font:{size:14}},legend:{display:false}}});
+const pct=Y.slice(1).map((y,i)=>+((L[i+1]-L[i])/L[i]*100).toFixed(2));
+const CF={
+t1:()=>({type:'line',data:{labels:Y,datasets:[{data:L,borderColor:C.k,backgroundColor:'rgba(42,157,143,.2)',fill:true,pointRadius:5,pointHoverRadius:8,tension:.1}]},
+ options:{...O('Tren luas lahan pertanian (ha)'),animation:{duration:1600,easing:'easeOutCubic',delay:c=>c.type==='data'&&c.mode==='default'?c.dataIndex*150:0},scales:{y:{min:zero.checked?0:undefined}},
+ plugins:{...O('').plugins,title:{display:true,text:'Tren luas lahan pertanian (ha)',font:{size:14}},tooltip:{callbacks:{label:c=>fmt(c.parsed.y,1)+' ha',afterLabel:c=>c.dataIndex?'Dibanding tahun sebelumnya '+S(L[c.dataIndex]-L[c.dataIndex-1])+' ha':''}}}}}),
+t2:()=>({type:'line',data:{labels:Y,datasets:[{label:'Indeks',data:idx(),borderColor:C.k,pointRadius:5,pointHoverRadius:8},{label:'Garis 100',data:Y.map(()=>100),borderColor:'#999',borderDash:[5,4],pointRadius:0,pointHoverRadius:0}]},
+ options:{...O('Indeks luas (tahun dasar = 100)'),animation:{duration:1600,easing:'easeOutCubic',delay:c=>c.type==='data'&&c.mode==='default'?c.dataIndex*150:0},plugins:{...O('').plugins,title:{display:true,text:'Indeks luas (tahun dasar = 100)',font:{size:14}},tooltip:{filter:i=>i.datasetIndex===0,callbacks:{label:c=>'Indeks '+fmt(c.parsed.y,2)}}}}}),
+t3:()=>({type:'bar',data:{labels:Y.slice(1),datasets:[{data:pct,backgroundColor:pct.map(sg)}]},
+ options:{...O('Laju perubahan tahunan (%)'),animation:stag(130),plugins:{...O('').plugins,title:{display:true,text:'Laju perubahan tahunan (%)',font:{size:14}},tooltip:{callbacks:{label:c=>fmt(c.parsed.y,2)+' %',afterLabel:c=>S(L[c.dataIndex+1]-L[c.dataIndex])+' ha'}}}}}),
+t4:()=>({type:'bar',data:{labels:Y,datasets:[{data:cum(),backgroundColor:cum().map(sg)}]},
+ options:{...O('Perubahan kumulatif terhadap '+base.value+' (ha)'),animation:stag(130),plugins:{...O('').plugins,title:{display:true,text:'Perubahan kumulatif terhadap '+base.value+' (ha)',font:{size:14}},tooltip:{callbacks:{label:c=>S(c.parsed.y)+' ha'}}}}}),
+t5:()=>({type:'bar',data:{labels:Y.slice(1).map((y,i)=>Y[i]+'-'+y),datasets:[{label:'Bertambah',data:D.gain,backgroundColor:C.g},{label:'Berkurang',data:D.loss.map(v=>-v),backgroundColor:C.r}]},
+ options:{...O('Bertambah vs berkurang per periode (ha)'),animation:stag(130),scales:{x:{stacked:true},y:{stacked:true}},plugins:{title:{display:true,text:'Bertambah vs berkurang per periode (ha)',font:{size:14}},legend:{display:true,position:'bottom'},tooltip:{callbacks:{label:c=>c.dataset.label+' '+fmt(Math.abs(c.parsed.y),0)+' ha',footer:i=>'Selisih bersih '+S(D.gain[i[0].dataIndex]-D.loss[i[0].dataIndex])+' ha'}}}}})
+};
+const CH={},mount=id=>{if(!CH[id])CH[id]=new Chart(document.getElementById(id),CF[id]())};
+const io='IntersectionObserver' in window?new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){mount(e.target.id);io.unobserve(e.target)}}),{threshold:.3}):null;
+Object.keys(CF).forEach(id=>io?io.observe(document.getElementById(id)):mount(id));
+const rebuild=ids=>ids.forEach(id=>{if(CH[id]){CH[id].destroy();delete CH[id]}mount(id)});
+base.onchange=()=>rebuild(['t2','t4']);
+zero.onchange=()=>rebuild(['t1']);
+replay.onclick=()=>rebuild(Object.keys(CF));
+})();
+</script>
+<style>.tr{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(380px,100%),1fr));margin-bottom:10px}.ch{height:300px;position:relative}</style>
+</main></body></html>
